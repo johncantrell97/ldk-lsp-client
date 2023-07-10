@@ -92,7 +92,7 @@ pub struct LiquidityManager<
 	pending_events: Arc<Mutex<Vec<Event>>>,
 	request_id_to_method_map: Mutex<HashMap<String, String>>,
 	lsps0_message_handler: LSPS0MessageHandler<ES>,
-	lsps2_message_handler: Option<JITChannelManager<ES, Descriptor, L, RM, CM, OM, Arc<Self>, NS>>,
+	lsps2_message_handler: Option<JITChannelManager<ES, Descriptor, L, RM, CM, OM, Arc<Self>, NS, M, T, F, R, SP>>,
 	provider_config: Option<LiquidityProviderConfig>,
 }
 

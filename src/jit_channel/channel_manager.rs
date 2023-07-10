@@ -13,15 +13,17 @@ use std::ops::Deref;
 use std::sync::{Arc, Mutex, RwLock};
 
 use bitcoin::secp256k1::PublicKey;
-use lightning::ln::channelmanager::InterceptId;
+use lightning::chain;
+use lightning::chain::chaininterface::{BroadcasterInterface, FeeEstimator};
+use lightning::ln::channelmanager::{InterceptId, ChannelManager};
 use lightning::ln::msgs::{
 	ChannelMessageHandler, ErrorAction, LightningError, OnionMessageHandler, RoutingMessageHandler,
 };
 use lightning::ln::peer_handler::{
 	APeerManager, CustomMessageHandler, PeerManager, SocketDescriptor,
 };
-use lightning::routing::gossip::NetworkGraph;
-use lightning::sign::{EntropySource, NodeSigner};
+use lightning::routing::router::Router;
+use lightning::sign::{EntropySource, NodeSigner, SignerProvider};
 use lightning::util::errors::APIError;
 use lightning::util::logger::{Level, Logger};
 
@@ -125,6 +127,11 @@ impl PeerState {
 pub struct JITChannelManager<
 	ES: Deref,
 	Descriptor: SocketDescriptor + Send + Sync + 'static,
+	M: Deref + Send + Sync + 'static,
+	T: Deref + Send + Sync + 'static,
+	F: Deref + Send + Sync + 'static,
+	R: Deref + Send + Sync + 'static,
+	SP: Deref + Send + Sync + 'static,
 	L: Deref + Send + Sync + 'static,
 	RM: Deref + Send + Sync + 'static,
 	CM: Deref + Send + Sync + 'static,
@@ -132,6 +139,11 @@ pub struct JITChannelManager<
 	CMH: Deref + Send + Sync + 'static,
 	NS: Deref + Send + Sync + 'static,
 > where
+	M::Target: chain::Watch<<SP::Target as SignerProvider>::Signer>,
+	T::Target: BroadcasterInterface,
+	F::Target: FeeEstimator,
+	R::Target: Router,
+	SP::Target: SignerProvider,
 	ES::Target: EntropySource,
 	L::Target: Logger,
 	RM::Target: RoutingMessageHandler,
@@ -142,6 +154,7 @@ pub struct JITChannelManager<
 {
 	entropy_source: ES,
 	peer_manager: Mutex<Option<Arc<PeerManager<Descriptor, CM, RM, OM, L, CMH, NS>>>>,
+	channel_manager: Arc<ChannelManager<M,T,ES,NS,SP,F,R,L>>,
 	pending_messages: Arc<Mutex<Vec<(PublicKey, LSPSMessage)>>>,
 	pending_events: Arc<Mutex<Vec<Event>>>,
 	per_peer_state: RwLock<HashMap<PublicKey, Mutex<PeerState>>>,
@@ -152,15 +165,25 @@ pub struct JITChannelManager<
 impl<
 		ES: Deref,
 		Descriptor: SocketDescriptor + Send + Sync + 'static,
+		M: Deref + Send + Sync + 'static,
+		T: Deref + Send + Sync + 'static,
+		F: Deref + Send + Sync + 'static,
+		R: Deref + Send + Sync + 'static,
+		SP: Deref + Send + Sync + 'static,
 		L: Deref + Send + Sync + 'static,
 		RM: Deref + Send + Sync + 'static,
 		CM: Deref + Send + Sync + 'static,
 		OM: Deref + Send + Sync + 'static,
 		CMH: Deref + Send + Sync + 'static,
 		NS: Deref + Send + Sync + 'static,
-	> JITChannelManager<ES, Descriptor, L, RM, CM, OM, CMH, NS>
+	> JITChannelManager<ES, Descriptor, L, RM, CM, OM, CMH, NS, M, T, F, R, SP>
 where
 	ES::Target: EntropySource,
+	M::Target: chain::Watch<<SP::Target as SignerProvider>::Signer>,
+	T::Target: BroadcasterInterface,
+	F::Target: FeeEstimator,
+	R::Target: Router,
+	SP::Target: SignerProvider,
 	L::Target: Logger,
 	RM::Target: RoutingMessageHandler,
 	CM::Target: ChannelMessageHandler,
@@ -172,12 +195,14 @@ where
 		entropy_source: ES, promise_secret: [u8; 32],
 		pending_messages: Arc<Mutex<Vec<(PublicKey, LSPSMessage)>>>,
 		pending_events: Arc<Mutex<Vec<Event>>>,
+		channel_manager: Arc<ChannelManager<M,T,ES,NS,SP,F,R,L>>,
 	) -> Self {
 		Self {
 			entropy_source,
 			promise_secret,
 			pending_messages,
 			pending_events,
+			channel_manager,
 			per_peer_state: RwLock::new(HashMap::new()),
 			channels_by_scid: RwLock::new(HashMap::new()),
 			peer_manager: Mutex::new(None),
@@ -795,7 +820,12 @@ impl<
 		OM: Deref + Send + Sync + 'static,
 		CMH: Deref + Send + Sync + 'static,
 		NS: Deref + Send + Sync + 'static,
-	> ProtocolMessageHandler for JITChannelManager<ES, Descriptor, L, RM, CM, OM, CMH, NS>
+		M: Deref + Send + Sync + 'static,
+		T: Deref + Send + Sync + 'static,
+		F: Deref + Send + Sync + 'static,
+		R: Deref + Send + Sync + 'static,
+		SP: Deref + Send + Sync + 'static,
+	> ProtocolMessageHandler for JITChannelManager<ES, Descriptor, L, RM, CM, OM, CMH, NS, M, T, F, R, SP>
 where
 	ES::Target: EntropySource,
 	L::Target: Logger,
@@ -804,6 +834,11 @@ where
 	OM::Target: OnionMessageHandler,
 	CMH::Target: CustomMessageHandler,
 	NS::Target: NodeSigner,
+	M::Target: chain::Watch<<SP::Target as SignerProvider>::Signer>,
+	T::Target: BroadcasterInterface,
+	F::Target: FeeEstimator,
+	R::Target: Router,
+	SP::Target: SignerProvider,
 {
 	type ProtocolMessage = Message;
 	const PROTOCOL_NUMBER: Option<u16> = Some(2);
