@@ -406,7 +406,7 @@ where
 {
 	type CustomMessage = RawLSPSMessage;
 
-	fn read<RD: io::Read>(
+	fn read<RD: lightning::io::Read>(
 		&self, message_type: u16, buffer: &mut RD,
 	) -> Result<Option<Self::CustomMessage>, lightning::ln::msgs::DecodeError> {
 		match message_type {
