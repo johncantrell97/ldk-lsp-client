@@ -7,6 +7,7 @@ use crate::transport::protocol::LSPS0MessageHandler;
 use bitcoin::secp256k1::PublicKey;
 use lightning::chain;
 use lightning::chain::chaininterface::{BroadcasterInterface, FeeEstimator};
+use lightning::ln::ChannelId;
 use lightning::ln::channelmanager::ChannelManager;
 use lightning::ln::channelmanager::InterceptId;
 use lightning::ln::features::{InitFeatures, NodeFeatures};
@@ -336,7 +337,7 @@ where {
 	/// Will forward the intercepted HTLC if it matches a channel
 	/// we need to forward a payment over otherwise it will be ignored.
 	pub fn channel_ready(
-		&self, user_channel_id: u128, channel_id: &[u8; 32], counterparty_node_id: &PublicKey,
+		&self, user_channel_id: u128, channel_id: &ChannelId, counterparty_node_id: &PublicKey,
 	) -> Result<(), APIError> {
 		if let Some(lsps2_message_handler) = &self.lsps2_message_handler {
 			lsps2_message_handler.channel_ready(

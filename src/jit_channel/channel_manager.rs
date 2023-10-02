@@ -15,6 +15,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use bitcoin::secp256k1::PublicKey;
 use lightning::chain;
 use lightning::chain::chaininterface::{BroadcasterInterface, FeeEstimator};
+use lightning::ln::ChannelId;
 use lightning::ln::channelmanager::{ChannelManager, InterceptId};
 use lightning::ln::msgs::{
 	ChannelMessageHandler, ErrorAction, LightningError, OnionMessageHandler, RoutingMessageHandler,
@@ -449,7 +450,7 @@ where
 
 	// figure out which intercept id is waiting on this channel and enqueue ForwardInterceptedHTLC event
 	pub(crate) fn channel_ready(
-		&self, user_channel_id: u128, channel_id: &[u8; 32], counterparty_node_id: &PublicKey,
+		&self, user_channel_id: u128, channel_id: &ChannelId, counterparty_node_id: &PublicKey,
 	) -> Result<(), APIError> {
 		let channels_by_scid = self.channels_by_scid.read().unwrap();
 
