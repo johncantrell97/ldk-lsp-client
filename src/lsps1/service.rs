@@ -43,8 +43,6 @@ pub struct LSPS1ServiceConfig {
 	pub token: Option<String>,
 	/// The options supported by the LSP.
 	pub options_supported: Option<OptionsSupported>,
-	/// The LSP's website.
-	pub website: Option<String>,
 }
 
 struct ChannelStateError(String);
@@ -171,7 +169,6 @@ where
 		&self, request_id: RequestId, counterparty_node_id: &PublicKey,
 	) -> Result<(), LightningError> {
 		let response = LSPS1Response::GetInfo(GetInfoResponse {
-			website: self.config.website.clone().unwrap().to_string(),
 			options: self
 				.config
 				.options_supported

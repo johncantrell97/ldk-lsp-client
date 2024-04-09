@@ -300,7 +300,6 @@ where
 				self.pending_events.enqueue(Event::LSPS1Client(LSPS1ClientEvent::GetInfoResponse {
 					user_channel_id,
 					counterparty_node_id: *counterparty_node_id,
-					website: result.website,
 					options_supported: result.options,
 				}))
 			},

@@ -73,8 +73,6 @@ pub struct OptionsSupported {
 /// A response to an [`GetInfoRequest`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetInfoResponse {
-	/// The website of the LSP.
-	pub website: String,
 	/// All options supported by the LSP.
 	pub options: OptionsSupported,
 }
