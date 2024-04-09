@@ -73,7 +73,7 @@ pub struct OptionsSupported {
 	pub max_channel_balance_sat: u64,
 }
 
-/// A response to an [`GetInfoRequest`].
+/// A response to a [`GetInfoRequest`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetInfoResponse {
 	/// All options supported by the LSP.
