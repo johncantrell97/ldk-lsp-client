@@ -122,6 +122,7 @@ pub struct CreateOrderResponse {
 	/// The id of the channel order.
 	pub order_id: OrderId,
 	/// The parameters of channel order.
+	#[serde(flatten)]
 	pub order: OrderParams,
 	/// The datetime when the order was created
 	pub created_at: chrono::DateTime<Utc>,
@@ -137,6 +138,7 @@ pub struct CreateOrderResponse {
 
 /// An object representing the state of an order.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderState {
 	/// The order has been created.
 	Created,
@@ -169,11 +171,12 @@ pub struct OrderPayment {
 	/// confirmed without a confirmation.
 	pub min_fee_for_0conf: u8,
 	/// Details regarding a detected on-chain payment.
-	pub onchain_payment: OnchainPayment,
+	pub onchain_payment: Option<OnchainPayment>,
 }
 
 /// The state of an [`OrderPayment`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentState {
 	/// A payment is expected.
 	ExpectPayment,
@@ -312,5 +315,96 @@ mod tests {
 
 		assert_eq!(json_str, serde_json::json!(options_supported).to_string());
 		assert_eq!(options_supported, serde_json::from_str(json_str).unwrap());
+	}
+
+	#[test]
+	fn parse_spec_test_vectors() {
+		// Here, we simply assert that we're able to parse all examples given in LSPS1.
+		let json_str = r#"{}"#;
+		let _get_info_request: GetInfoRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"options": {
+				"min_required_channel_confirmations": 0,
+				"min_funding_confirms_within_blocks" : 6,
+				"min_onchain_payment_confirmations": null,
+				"supports_zero_channel_reserve": true,
+				"min_onchain_payment_size_sat": null,
+				"max_channel_expiry_blocks": 20160,
+				"min_initial_client_balance_sat": "20000",
+				"max_initial_client_balance_sat": "100000000",
+				"min_initial_lsp_balance_sat": "0",
+				"max_initial_lsp_balance_sat": "100000000",
+				"min_channel_balance_sat": "50000",
+				"max_channel_balance_sat": "100000000"
+			}
+		}"#;
+		let _get_info_response: GetInfoResponse = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"lsp_balance_sat": "5000000",
+			"client_balance_sat": "2000000",
+			"required_channel_confirmations" : 0,
+			"funding_confirms_within_blocks": 6,
+			"channel_expiry_blocks": 144,
+			"token": "",
+			"refund_onchain_address": "bc1qvmsy0f3yyes6z9jvddk8xqwznndmdwapvrc0xrmhd3vqj5rhdrrq6hz49h",
+			"announce_channel": true
+		}"#;
+		let _create_order_request: CreateOrderRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"order_id": "bb4b5d0a-8334-49d8-9463-90a6d413af7c",
+			"lsp_balance_sat": "5000000",
+			"client_balance_sat": "2000000",
+			"required_channel_confirmations" : 0,
+			"funding_confirms_within_blocks": 1,
+			"channel_expiry_blocks": 12,
+			"token": "",
+			"created_at": "2012-04-23T18:25:43.511Z",
+			"expires_at": "2015-01-25T19:29:44.612Z",
+			"announce_channel": true,
+			"order_state": "CREATED",
+			"payment": {
+				"state": "EXPECT_PAYMENT",
+				"fee_total_sat": "8888",
+				"order_total_sat": "2008888",
+				"bolt11_invoice": "lnbc252u1p3aht9ysp580g4633gd2x9lc5al0wd8wx0mpn9748jeyz46kqjrpxn52uhfpjqpp5qgf67tcqmuqehzgjm8mzya90h73deafvr4m5705l5u5l4r05l8cqdpud3h8ymm4w3jhytnpwpczqmt0de6xsmre2pkxzm3qydmkzdjrdev9s7zhgfaqxqyjw5qcqpjrzjqt6xptnd85lpqnu2lefq4cx070v5cdwzh2xlvmdgnu7gqp4zvkus5zapryqqx9qqqyqqqqqqqqqqqcsq9q9qyysgqen77vu8xqjelum24hgjpgfdgfgx4q0nehhalcmuggt32japhjuksq9jv6eksjfnppm4hrzsgyxt8y8xacxut9qv3fpyetz8t7tsymygq8yzn05",
+				"onchain_address": "bc1p5uvtaxzkjwvey2tfy49k5vtqfpjmrgm09cvs88ezyy8h2zv7jhas9tu4yr",
+				"min_onchain_payment_confirmations": 0,
+				"min_fee_for_0conf": 253,
+				"onchain_payment": null
+			},
+			"channel": null
+		}"#;
+		let _create_order_response: CreateOrderResponse = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"order_id": "bb4b5d0a-8334-49d8-9463-90a6d413af7c"
+		}"#;
+		let _get_order_request: GetOrderRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"state": "EXPECT_PAYMENT",
+			"fee_total_sat": "8888",
+			"order_total_sat": "2008888",
+			"bolt11_invoice": "lnbc252u1p3aht9ysp580g4633gd2x9lc5al0wd8wx0mpn9748jeyz46kqjrpxn52uhfpjqpp5qgf67tcqmuqehzgjm8mzya90h73deafvr4m5705l5u5l4r05l8cqdpud3h8ymm4w3jhytnpwpczqmt0de6xsmre2pkxzm3qydmkzdjrdev9s7zhgfaqxqyjw5qcqpjrzjqt6xptnd85lpqnu2lefq4cx070v5cdwzh2xlvmdgnu7gqp4zvkus5zapryqqx9qqqyqqqqqqqqqqqcsq9q9qyysgqen77vu8xqjelum24hgjpgfdgfgx4q0nehhalcmuggt32japhjuksq9jv6eksjfnppm4hrzsgyxt8y8xacxut9qv3fpyetz8t7tsymygq8yzn05",
+			"onchain_address": "bc1p5uvtaxzkjwvey2tfy49k5vtqfpjmrgm09cvs88ezyy8h2zv7jhas9tu4yr",
+			"min_onchain_payment_confirmations": 1,
+			"min_fee_for_0conf": 253,
+			"onchain_payment": {
+				"outpoint": "0301e0480b374b32851a9462db29dc19fe830a7f7d7a88b81612b9d42099c0ae:1",
+				"sat": "1200",
+				"confirmed": false
+			}
+		}"#;
+		let _payment: OrderPayment = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"funded_at": "2012-04-23T18:25:43.511Z",
+			"funding_outpoint": "0301e0480b374b32851a9462db29dc19fe830a7f7d7a88b81612b9d42099c0ae:0",
+			"expires_at": "2012-04-23T18:25:43.511Z"
+		}"#;
+		let _channel: ChannelInfo = serde_json::from_str(json_str).unwrap();
 	}
 }
