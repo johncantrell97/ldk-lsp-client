@@ -204,11 +204,11 @@ pub struct OnchainPayment {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ChannelInfo {
 	/// The datetime when the funding transaction has been published.
-	pub funded_at: String,
+	pub funded_at: chrono::DateTime<Utc>,
 	/// The outpoint of the funding transaction.
 	pub funding_outpoint: String,
 	/// The earliest datetime when the channel may be closed by the LSP.
-	pub expires_at: String,
+	pub expires_at: chrono::DateTime<Utc>,
 }
 
 /// A request made to an LSP to retrieve information about an previously made order.
