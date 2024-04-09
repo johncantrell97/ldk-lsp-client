@@ -38,8 +38,10 @@ pub struct GetInfoRequest {}
 /// An object representing the supported protocol options.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct OptionsSupported {
-	/// The minimum number of block confirmations before the LSP accepts a channel as confirmed.
-	pub min_channel_confirmations: u8,
+	/// The smallest number of confirmations needed for the LSP to accept a channel as confirmed.
+	pub min_required_channel_confirmations: u8,
+	/// The smallest number of blocks in which the LSP can confirm the funding transaction.
+	pub min_funding_confirms_within_blocks: u8,
 	/// The minimum number of block confirmations before the LSP accepts an on-chain payment as confirmed.
 	pub min_onchain_payment_confirmations: Option<u8>,
 	/// Indicates if the LSP supports zero reserve.
@@ -84,6 +86,7 @@ pub struct GetInfoResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct CreateOrderRequest {
 	/// The order made.
+	#[serde(flatten)]
 	pub order: OrderParams,
 }
 
@@ -99,8 +102,10 @@ pub struct OrderParams {
 	/// the channel.
 	#[serde(with = "string_amount")]
 	pub client_balance_sat: u64,
-	/// The number of blocks the client wants to wait maximally for the channel to be confirmed.
-	pub confirms_within_blocks: u32,
+	/// The number of confirmations the funding tx must have before the LSP sends `channel_ready`.
+	pub required_channel_confirmations: u8,
+	/// The maximum number of blocks the client wants to wait until the funding transaction is confirmed.
+	pub funding_confirms_within_blocks: u8,
 	/// Indicates how long the channel is leased for in block time.
 	pub channel_expiry_blocks: u32,
 	/// May contain arbitrary associated data like a coupon code or a authentication token.
@@ -275,7 +280,8 @@ mod tests {
 
 	#[test]
 	fn options_supported_serialization() {
-		let min_channel_confirmations = 6;
+		let min_required_channel_confirmations = 0;
+		let min_funding_confirms_within_blocks = 6;
 		let min_onchain_payment_confirmations = Some(6);
 		let supports_zero_channel_reserve = true;
 		let min_onchain_payment_size_sat = Some(100_000);
@@ -288,7 +294,8 @@ mod tests {
 		let max_channel_balance_sat = 100_000_000;
 
 		let options_supported = OptionsSupported {
-			min_channel_confirmations,
+			min_required_channel_confirmations,
+			min_funding_confirms_within_blocks,
 			min_onchain_payment_confirmations,
 			supports_zero_channel_reserve,
 			min_onchain_payment_size_sat,
@@ -301,7 +308,8 @@ mod tests {
 			max_channel_balance_sat,
 		};
 
-		let json_str = r#"{"max_channel_balance_sat":"100000000","max_channel_expiry_blocks":144,"max_initial_client_balance_sat":"100000000","max_initial_lsp_balance_sat":"100000000","min_channel_balance_sat":"100000","min_channel_confirmations":6,"min_initial_client_balance_sat":"10000000","min_initial_lsp_balance_sat":"100000","min_onchain_payment_confirmations":6,"min_onchain_payment_size_sat":"100000","supports_zero_channel_reserve":true}"#;
+		let json_str = r#"{"max_channel_balance_sat":"100000000","max_channel_expiry_blocks":144,"max_initial_client_balance_sat":"100000000","max_initial_lsp_balance_sat":"100000000","min_channel_balance_sat":"100000","min_funding_confirms_within_blocks":6,"min_initial_client_balance_sat":"10000000","min_initial_lsp_balance_sat":"100000","min_onchain_payment_confirmations":6,"min_onchain_payment_size_sat":"100000","min_required_channel_confirmations":0,"supports_zero_channel_reserve":true}"#;
+
 		assert_eq!(json_str, serde_json::json!(options_supported).to_string());
 		assert_eq!(options_supported, serde_json::from_str(json_str).unwrap());
 	}

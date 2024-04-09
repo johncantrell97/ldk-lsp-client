@@ -35,8 +35,6 @@ pub enum LSPS1ClientEvent {
 		user_channel_id: u128,
 		/// The node id of the LSP that provided this response.
 		counterparty_node_id: PublicKey,
-		/// The website of the LSP.
-		website: String,
 		/// All options supported by the LSP.
 		options_supported: OptionsSupported,
 	},
