@@ -12,8 +12,8 @@
 use super::event::LSPS1ServiceEvent;
 use super::msgs::{
 	ChannelInfo, CreateOrderRequest, CreateOrderResponse, GetInfoResponse, GetOrderRequest,
-	LSPS1Message, LSPS1Request, LSPS1Response, OptionsSupported, OrderId, OrderParams,
-	OrderPayment, OrderState, LSPS1_CREATE_ORDER_REQUEST_ORDER_MISMATCH_ERROR_CODE,
+	LSPS1Message, LSPS1Request, LSPS1Response, OptionsSupported, OrderId, OrderParams, OrderState,
+	PaymentInfo, LSPS1_CREATE_ORDER_REQUEST_ORDER_MISMATCH_ERROR_CODE,
 };
 use super::utils::is_valid;
 use crate::message_queue::MessageQueue;
@@ -75,7 +75,7 @@ struct OutboundLSPS1Config {
 	order: OrderParams,
 	created_at: chrono::DateTime<Utc>,
 	expires_at: chrono::DateTime<Utc>,
-	payment: OrderPayment,
+	payment: PaymentInfo,
 }
 
 struct OutboundCRChannel {
@@ -86,7 +86,7 @@ struct OutboundCRChannel {
 impl OutboundCRChannel {
 	fn new(
 		order: OrderParams, created_at: chrono::DateTime<Utc>, expires_at: chrono::DateTime<Utc>,
-		order_id: OrderId, payment: OrderPayment,
+		order_id: OrderId, payment: PaymentInfo,
 	) -> Self {
 		Self {
 			state: OutboundRequestState::OrderCreated { order_id },
@@ -238,7 +238,7 @@ where
 	///
 	/// [`LSPS1ServiceEvent::RequestForPaymentDetails`]: crate::lsps1::event::LSPS1ServiceEvent::RequestForPaymentDetails
 	pub fn send_payment_details(
-		&self, request_id: RequestId, counterparty_node_id: &PublicKey, payment: OrderPayment,
+		&self, request_id: RequestId, counterparty_node_id: &PublicKey, payment: PaymentInfo,
 		created_at: chrono::DateTime<Utc>, expires_at: chrono::DateTime<Utc>,
 	) -> Result<(), APIError> {
 		let (result, response) = {

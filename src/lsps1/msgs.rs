@@ -132,7 +132,7 @@ pub struct CreateOrderResponse {
 	/// The current state of the order.
 	pub order_state: OrderState,
 	/// Contains details about how to pay for the order.
-	pub payment: OrderPayment,
+	pub payment: PaymentInfo,
 	/// Contains information about the channel state.
 	pub channel: Option<ChannelInfo>,
 }
@@ -151,7 +151,7 @@ pub enum OrderState {
 
 /// Details regarding how to pay for an order.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct OrderPayment {
+pub struct PaymentInfo {
 	/// Indicates the current state of the payment.
 	pub state: PaymentState,
 	/// The total fee the LSP will charge to open this channel in satoshi.
@@ -175,7 +175,7 @@ pub struct OrderPayment {
 	pub onchain_payment: Option<OnchainPayment>,
 }
 
-/// The state of an [`OrderPayment`].
+/// The state of an [`PaymentInfo`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentState {
@@ -399,7 +399,7 @@ mod tests {
 				"confirmed": false
 			}
 		}"#;
-		let _payment: OrderPayment = serde_json::from_str(json_str).unwrap();
+		let _payment: PaymentInfo = serde_json::from_str(json_str).unwrap();
 
 		let json_str = r#"{
 			"funded_at": "2012-04-23T18:25:43.511Z",

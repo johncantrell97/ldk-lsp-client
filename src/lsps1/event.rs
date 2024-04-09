@@ -9,7 +9,7 @@
 
 //! Contains LSPS1 event types
 
-use super::msgs::{ChannelInfo, OptionsSupported, OrderId, OrderParams, OrderPayment};
+use super::msgs::{ChannelInfo, OptionsSupported, OrderId, OrderParams, PaymentInfo};
 
 use crate::lsps0::ser::RequestId;
 use crate::prelude::String;
@@ -60,7 +60,7 @@ pub enum LSPS1ClientEvent {
 		/// The order created by client and approved by LSP.
 		order: OrderParams,
 		/// The details regarding payment of the order
-		payment: OrderPayment,
+		payment: PaymentInfo,
 		/// The details regarding state of the channel ordered.
 		channel: Option<ChannelInfo>,
 	},
