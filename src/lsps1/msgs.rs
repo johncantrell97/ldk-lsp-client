@@ -7,6 +7,7 @@ use crate::lsps0::ser::{
 use crate::prelude::{String, Vec};
 
 use bitcoin::address::{Address, NetworkUnchecked};
+use bitcoin::OutPoint;
 
 use lightning_invoice::Bolt11Invoice;
 
@@ -206,7 +207,7 @@ pub struct ChannelInfo {
 	/// The datetime when the funding transaction has been published.
 	pub funded_at: chrono::DateTime<Utc>,
 	/// The outpoint of the funding transaction.
-	pub funding_outpoint: String,
+	pub funding_outpoint: OutPoint,
 	/// The earliest datetime when the channel may be closed by the LSP.
 	pub expires_at: chrono::DateTime<Utc>,
 }
