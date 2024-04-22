@@ -1,3 +1,13 @@
+# 0.1.0-alpha.3 - Apr. 22, 2024
+This is the forth alpha release of `lightning-liquidity`. It features
+a number of bug fixes and performance improvements over the previous release.
+
+In particular, it introduces the final breaking changes of the LSPS2 spec that
+is close to finalization, and fixes a number of serialization-related bugs.
+
+**Note:** This release is still considered experimental, should not be run in
+production, and no compatibility guarantees are given until the release of 0.1.0.
+
 # 0.1.0-alpha.2 - Mar. 6, 2024
 This is the third alpha release of `lightning-liquidity`. It features
 a number of bug fixes and performance improvements over the previous release.
