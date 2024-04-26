@@ -7,6 +7,7 @@ use crate::lsps0::ser::{
 use crate::prelude::{String, Vec};
 
 use bitcoin::address::{Address, NetworkUnchecked};
+use bitcoin::OutPoint;
 
 use lightning_invoice::Bolt11Invoice;
 
@@ -38,8 +39,10 @@ pub struct GetInfoRequest {}
 /// An object representing the supported protocol options.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct OptionsSupported {
-	/// The minimum number of block confirmations before the LSP accepts a channel as confirmed.
-	pub min_channel_confirmations: u8,
+	/// The smallest number of confirmations needed for the LSP to accept a channel as confirmed.
+	pub min_required_channel_confirmations: u8,
+	/// The smallest number of blocks in which the LSP can confirm the funding transaction.
+	pub min_funding_confirms_within_blocks: u8,
 	/// The minimum number of block confirmations before the LSP accepts an on-chain payment as confirmed.
 	pub min_onchain_payment_confirmations: Option<u8>,
 	/// Indicates if the LSP supports zero reserve.
@@ -70,11 +73,9 @@ pub struct OptionsSupported {
 	pub max_channel_balance_sat: u64,
 }
 
-/// A response to an [`GetInfoRequest`].
+/// A response to a [`GetInfoRequest`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct GetInfoResponse {
-	/// The website of the LSP.
-	pub website: String,
 	/// All options supported by the LSP.
 	pub options: OptionsSupported,
 }
@@ -86,6 +87,7 @@ pub struct GetInfoResponse {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct CreateOrderRequest {
 	/// The order made.
+	#[serde(flatten)]
 	pub order: OrderParams,
 }
 
@@ -101,8 +103,10 @@ pub struct OrderParams {
 	/// the channel.
 	#[serde(with = "string_amount")]
 	pub client_balance_sat: u64,
-	/// The number of blocks the client wants to wait maximally for the channel to be confirmed.
-	pub confirms_within_blocks: u32,
+	/// The number of confirmations the funding tx must have before the LSP sends `channel_ready`.
+	pub required_channel_confirmations: u8,
+	/// The maximum number of blocks the client wants to wait until the funding transaction is confirmed.
+	pub funding_confirms_within_blocks: u8,
 	/// Indicates how long the channel is leased for in block time.
 	pub channel_expiry_blocks: u32,
 	/// May contain arbitrary associated data like a coupon code or a authentication token.
@@ -119,6 +123,7 @@ pub struct CreateOrderResponse {
 	/// The id of the channel order.
 	pub order_id: OrderId,
 	/// The parameters of channel order.
+	#[serde(flatten)]
 	pub order: OrderParams,
 	/// The datetime when the order was created
 	pub created_at: chrono::DateTime<Utc>,
@@ -127,13 +132,14 @@ pub struct CreateOrderResponse {
 	/// The current state of the order.
 	pub order_state: OrderState,
 	/// Contains details about how to pay for the order.
-	pub payment: OrderPayment,
+	pub payment: PaymentInfo,
 	/// Contains information about the channel state.
 	pub channel: Option<ChannelInfo>,
 }
 
 /// An object representing the state of an order.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum OrderState {
 	/// The order has been created.
 	Created,
@@ -145,7 +151,7 @@ pub enum OrderState {
 
 /// Details regarding how to pay for an order.
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
-pub struct OrderPayment {
+pub struct PaymentInfo {
 	/// Indicates the current state of the payment.
 	pub state: PaymentState,
 	/// The total fee the LSP will charge to open this channel in satoshi.
@@ -166,11 +172,12 @@ pub struct OrderPayment {
 	/// confirmed without a confirmation.
 	pub min_fee_for_0conf: u8,
 	/// Details regarding a detected on-chain payment.
-	pub onchain_payment: OnchainPayment,
+	pub onchain_payment: Option<OnchainPayment>,
 }
 
-/// The state of an [`OrderPayment`].
+/// The state of an [`PaymentInfo`].
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum PaymentState {
 	/// A payment is expected.
 	ExpectPayment,
@@ -198,11 +205,11 @@ pub struct OnchainPayment {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ChannelInfo {
 	/// The datetime when the funding transaction has been published.
-	pub funded_at: String,
+	pub funded_at: chrono::DateTime<Utc>,
 	/// The outpoint of the funding transaction.
-	pub funding_outpoint: String,
+	pub funding_outpoint: OutPoint,
 	/// The earliest datetime when the channel may be closed by the LSP.
-	pub expires_at: String,
+	pub expires_at: chrono::DateTime<Utc>,
 }
 
 /// A request made to an LSP to retrieve information about an previously made order.
@@ -277,7 +284,8 @@ mod tests {
 
 	#[test]
 	fn options_supported_serialization() {
-		let min_channel_confirmations = 6;
+		let min_required_channel_confirmations = 0;
+		let min_funding_confirms_within_blocks = 6;
 		let min_onchain_payment_confirmations = Some(6);
 		let supports_zero_channel_reserve = true;
 		let min_onchain_payment_size_sat = Some(100_000);
@@ -290,7 +298,8 @@ mod tests {
 		let max_channel_balance_sat = 100_000_000;
 
 		let options_supported = OptionsSupported {
-			min_channel_confirmations,
+			min_required_channel_confirmations,
+			min_funding_confirms_within_blocks,
 			min_onchain_payment_confirmations,
 			supports_zero_channel_reserve,
 			min_onchain_payment_size_sat,
@@ -303,8 +312,100 @@ mod tests {
 			max_channel_balance_sat,
 		};
 
-		let json_str = r#"{"max_channel_balance_sat":"100000000","max_channel_expiry_blocks":144,"max_initial_client_balance_sat":"100000000","max_initial_lsp_balance_sat":"100000000","min_channel_balance_sat":"100000","min_channel_confirmations":6,"min_initial_client_balance_sat":"10000000","min_initial_lsp_balance_sat":"100000","min_onchain_payment_confirmations":6,"min_onchain_payment_size_sat":"100000","supports_zero_channel_reserve":true}"#;
+		let json_str = r#"{"max_channel_balance_sat":"100000000","max_channel_expiry_blocks":144,"max_initial_client_balance_sat":"100000000","max_initial_lsp_balance_sat":"100000000","min_channel_balance_sat":"100000","min_funding_confirms_within_blocks":6,"min_initial_client_balance_sat":"10000000","min_initial_lsp_balance_sat":"100000","min_onchain_payment_confirmations":6,"min_onchain_payment_size_sat":"100000","min_required_channel_confirmations":0,"supports_zero_channel_reserve":true}"#;
+
 		assert_eq!(json_str, serde_json::json!(options_supported).to_string());
 		assert_eq!(options_supported, serde_json::from_str(json_str).unwrap());
+	}
+
+	#[test]
+	fn parse_spec_test_vectors() {
+		// Here, we simply assert that we're able to parse all examples given in LSPS1.
+		let json_str = r#"{}"#;
+		let _get_info_request: GetInfoRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"options": {
+				"min_required_channel_confirmations": 0,
+				"min_funding_confirms_within_blocks" : 6,
+				"min_onchain_payment_confirmations": null,
+				"supports_zero_channel_reserve": true,
+				"min_onchain_payment_size_sat": null,
+				"max_channel_expiry_blocks": 20160,
+				"min_initial_client_balance_sat": "20000",
+				"max_initial_client_balance_sat": "100000000",
+				"min_initial_lsp_balance_sat": "0",
+				"max_initial_lsp_balance_sat": "100000000",
+				"min_channel_balance_sat": "50000",
+				"max_channel_balance_sat": "100000000"
+			}
+		}"#;
+		let _get_info_response: GetInfoResponse = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"lsp_balance_sat": "5000000",
+			"client_balance_sat": "2000000",
+			"required_channel_confirmations" : 0,
+			"funding_confirms_within_blocks": 6,
+			"channel_expiry_blocks": 144,
+			"token": "",
+			"refund_onchain_address": "bc1qvmsy0f3yyes6z9jvddk8xqwznndmdwapvrc0xrmhd3vqj5rhdrrq6hz49h",
+			"announce_channel": true
+		}"#;
+		let _create_order_request: CreateOrderRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"order_id": "bb4b5d0a-8334-49d8-9463-90a6d413af7c",
+			"lsp_balance_sat": "5000000",
+			"client_balance_sat": "2000000",
+			"required_channel_confirmations" : 0,
+			"funding_confirms_within_blocks": 1,
+			"channel_expiry_blocks": 12,
+			"token": "",
+			"created_at": "2012-04-23T18:25:43.511Z",
+			"expires_at": "2015-01-25T19:29:44.612Z",
+			"announce_channel": true,
+			"order_state": "CREATED",
+			"payment": {
+				"state": "EXPECT_PAYMENT",
+				"fee_total_sat": "8888",
+				"order_total_sat": "2008888",
+				"bolt11_invoice": "lnbc252u1p3aht9ysp580g4633gd2x9lc5al0wd8wx0mpn9748jeyz46kqjrpxn52uhfpjqpp5qgf67tcqmuqehzgjm8mzya90h73deafvr4m5705l5u5l4r05l8cqdpud3h8ymm4w3jhytnpwpczqmt0de6xsmre2pkxzm3qydmkzdjrdev9s7zhgfaqxqyjw5qcqpjrzjqt6xptnd85lpqnu2lefq4cx070v5cdwzh2xlvmdgnu7gqp4zvkus5zapryqqx9qqqyqqqqqqqqqqqcsq9q9qyysgqen77vu8xqjelum24hgjpgfdgfgx4q0nehhalcmuggt32japhjuksq9jv6eksjfnppm4hrzsgyxt8y8xacxut9qv3fpyetz8t7tsymygq8yzn05",
+				"onchain_address": "bc1p5uvtaxzkjwvey2tfy49k5vtqfpjmrgm09cvs88ezyy8h2zv7jhas9tu4yr",
+				"min_onchain_payment_confirmations": 0,
+				"min_fee_for_0conf": 253,
+				"onchain_payment": null
+			},
+			"channel": null
+		}"#;
+		let _create_order_response: CreateOrderResponse = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"order_id": "bb4b5d0a-8334-49d8-9463-90a6d413af7c"
+		}"#;
+		let _get_order_request: GetOrderRequest = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"state": "EXPECT_PAYMENT",
+			"fee_total_sat": "8888",
+			"order_total_sat": "2008888",
+			"bolt11_invoice": "lnbc252u1p3aht9ysp580g4633gd2x9lc5al0wd8wx0mpn9748jeyz46kqjrpxn52uhfpjqpp5qgf67tcqmuqehzgjm8mzya90h73deafvr4m5705l5u5l4r05l8cqdpud3h8ymm4w3jhytnpwpczqmt0de6xsmre2pkxzm3qydmkzdjrdev9s7zhgfaqxqyjw5qcqpjrzjqt6xptnd85lpqnu2lefq4cx070v5cdwzh2xlvmdgnu7gqp4zvkus5zapryqqx9qqqyqqqqqqqqqqqcsq9q9qyysgqen77vu8xqjelum24hgjpgfdgfgx4q0nehhalcmuggt32japhjuksq9jv6eksjfnppm4hrzsgyxt8y8xacxut9qv3fpyetz8t7tsymygq8yzn05",
+			"onchain_address": "bc1p5uvtaxzkjwvey2tfy49k5vtqfpjmrgm09cvs88ezyy8h2zv7jhas9tu4yr",
+			"min_onchain_payment_confirmations": 1,
+			"min_fee_for_0conf": 253,
+			"onchain_payment": {
+				"outpoint": "0301e0480b374b32851a9462db29dc19fe830a7f7d7a88b81612b9d42099c0ae:1",
+				"sat": "1200",
+				"confirmed": false
+			}
+		}"#;
+		let _payment: PaymentInfo = serde_json::from_str(json_str).unwrap();
+
+		let json_str = r#"{
+			"funded_at": "2012-04-23T18:25:43.511Z",
+			"funding_outpoint": "0301e0480b374b32851a9462db29dc19fe830a7f7d7a88b81612b9d42099c0ae:0",
+			"expires_at": "2012-04-23T18:25:43.511Z"
+		}"#;
+		let _channel: ChannelInfo = serde_json::from_str(json_str).unwrap();
 	}
 }
