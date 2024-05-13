@@ -1,13 +1,13 @@
 //! Message, request, and other primitive types used to implement LSPS1.
 
 use crate::lsps0::ser::{
-	string_amount, string_amount_option, LSPSMessage, RequestId, ResponseError,
+	string_amount, string_amount_option, u32_fee_rate, LSPSMessage, RequestId, ResponseError,
 };
 
 use crate::prelude::{String, Vec};
 
 use bitcoin::address::{Address, NetworkUnchecked};
-use bitcoin::OutPoint;
+use bitcoin::{FeeRate, OutPoint};
 
 use lightning_invoice::Bolt11Invoice;
 
@@ -170,7 +170,8 @@ pub struct PaymentInfo {
 	pub min_onchain_payment_confirmations: Option<u16>,
 	/// The minimum fee rate for the on-chain payment in case the client wants the payment to be
 	/// confirmed without a confirmation.
-	pub min_fee_for_0conf: u8,
+	#[serde(with = "u32_fee_rate")]
+	pub min_fee_for_0conf: FeeRate,
 	/// Details regarding a detected on-chain payment.
 	pub onchain_payment: Option<OnchainPayment>,
 }

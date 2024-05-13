@@ -653,3 +653,26 @@ pub(crate) mod string_amount_option {
 		}
 	}
 }
+
+#[cfg(lsps1)]
+pub(crate) mod u32_fee_rate {
+	use bitcoin::FeeRate;
+	use serde::{Deserialize, Deserializer, Serializer};
+
+	pub(crate) fn serialize<S>(x: &FeeRate, s: S) -> Result<S::Ok, S::Error>
+	where
+		S: Serializer,
+	{
+		let fee_rate_sat_kwu = x.to_sat_per_kwu();
+		s.serialize_u32(fee_rate_sat_kwu as u32)
+	}
+
+	pub(crate) fn deserialize<'de, D>(deserializer: D) -> Result<FeeRate, D::Error>
+	where
+		D: Deserializer<'de>,
+	{
+		let fee_rate_sat_kwu = u32::deserialize(deserializer)?;
+
+		Ok(FeeRate::from_sat_per_kwu(fee_rate_sat_kwu as u64))
+	}
+}
