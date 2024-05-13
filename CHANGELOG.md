@@ -1,3 +1,10 @@
+# 0.1.0-alpha.4 - May 13, 2024
+This is the fifth alpha release of `lightning-liquidity`. It is a simple
+maintenance release bumping the LDK dependency to v0.0.123.
+
+**Note:** This release is still considered experimental, should not be run in
+production, and no compatibility guarantees are given until the release of 0.1.0.
+
 # 0.1.0-alpha.3 - Apr. 22, 2024
 This is the forth alpha release of `lightning-liquidity`. It features
 a number of bug fixes and performance improvements over the previous release.
