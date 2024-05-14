@@ -1,13 +1,13 @@
 //! Message, request, and other primitive types used to implement LSPS1.
 
 use crate::lsps0::ser::{
-	string_amount, string_amount_option, LSPSMessage, RequestId, ResponseError,
+	string_amount, string_amount_option, u32_fee_rate, LSPSMessage, RequestId, ResponseError,
 };
 
 use crate::prelude::{String, Vec};
 
 use bitcoin::address::{Address, NetworkUnchecked};
-use bitcoin::OutPoint;
+use bitcoin::{FeeRate, OutPoint};
 
 use lightning_invoice::Bolt11Invoice;
 
@@ -40,11 +40,11 @@ pub struct GetInfoRequest {}
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct OptionsSupported {
 	/// The smallest number of confirmations needed for the LSP to accept a channel as confirmed.
-	pub min_required_channel_confirmations: u8,
+	pub min_required_channel_confirmations: u16,
 	/// The smallest number of blocks in which the LSP can confirm the funding transaction.
-	pub min_funding_confirms_within_blocks: u8,
+	pub min_funding_confirms_within_blocks: u16,
 	/// The minimum number of block confirmations before the LSP accepts an on-chain payment as confirmed.
-	pub min_onchain_payment_confirmations: Option<u8>,
+	pub min_onchain_payment_confirmations: Option<u16>,
 	/// Indicates if the LSP supports zero reserve.
 	pub supports_zero_channel_reserve: bool,
 	/// Indicates the minimum amount of satoshi that is required for the LSP to accept a payment
@@ -104,9 +104,9 @@ pub struct OrderParams {
 	#[serde(with = "string_amount")]
 	pub client_balance_sat: u64,
 	/// The number of confirmations the funding tx must have before the LSP sends `channel_ready`.
-	pub required_channel_confirmations: u8,
+	pub required_channel_confirmations: u16,
 	/// The maximum number of blocks the client wants to wait until the funding transaction is confirmed.
-	pub funding_confirms_within_blocks: u8,
+	pub funding_confirms_within_blocks: u16,
 	/// Indicates how long the channel is leased for in block time.
 	pub channel_expiry_blocks: u32,
 	/// May contain arbitrary associated data like a coupon code or a authentication token.
@@ -167,10 +167,11 @@ pub struct PaymentInfo {
 	pub onchain_address: Address<NetworkUnchecked>,
 	/// The minimum number of block confirmations that are required for the on-chain payment to be
 	/// considered confirmed.
-	pub min_onchain_payment_confirmations: Option<u8>,
+	pub min_onchain_payment_confirmations: Option<u16>,
 	/// The minimum fee rate for the on-chain payment in case the client wants the payment to be
 	/// confirmed without a confirmation.
-	pub min_fee_for_0conf: u8,
+	#[serde(with = "u32_fee_rate")]
+	pub min_fee_for_0conf: FeeRate,
 	/// Details regarding a detected on-chain payment.
 	pub onchain_payment: Option<OnchainPayment>,
 }
