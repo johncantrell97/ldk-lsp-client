@@ -79,6 +79,8 @@ impl TryFrom<LSPSMessage> for LSPS0Message {
 			#[cfg(lsps1)]
 			LSPSMessage::LSPS1(_) => Err(()),
 			LSPSMessage::LSPS2(_) => Err(()),
+			#[cfg(feature = "lsps5")]
+			LSPSMessage::LSPS5(_) => Err(()),
 		}
 	}
 }
