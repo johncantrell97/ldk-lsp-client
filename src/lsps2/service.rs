@@ -78,7 +78,7 @@ enum HTLCInterceptedAction {
 	OpenChannel(OpenChannelParams),
 	/// The forwarding of the intercepted HTLC.
 	ForwardHTLC(ChannelId),
-	ForwardPayment(ChannelId, FeePayment),
+	ForwardPayment(ForwardPaymentAction),
 }
 
 /// The forwarding of a payment while skimming the JIT channel opening fee.
@@ -240,10 +240,11 @@ impl OutboundJITChannelState {
 						opening_fee_msat: *opening_fee_msat,
 						channel_id: *channel_id,
 					};
-					let forward_payment = HTLCInterceptedAction::ForwardPayment(
-						*channel_id,
-						FeePayment { htlcs, opening_fee_msat: *opening_fee_msat },
-					);
+					let forward_payment =
+						HTLCInterceptedAction::ForwardPayment(ForwardPaymentAction(
+							*channel_id,
+							FeePayment { htlcs, opening_fee_msat: *opening_fee_msat },
+						));
 					Ok((pending_payment_forward, Some(forward_payment)))
 				} else {
 					let pending_payment = OutboundJITChannelState::PendingPayment {
@@ -732,8 +733,10 @@ where
 								)?;
 							},
 							Ok(Some(HTLCInterceptedAction::ForwardPayment(
-								channel_id,
-								FeePayment { opening_fee_msat, htlcs },
+								ForwardPaymentAction(
+									channel_id,
+									FeePayment { opening_fee_msat, htlcs },
+								),
 							))) => {
 								let amounts_to_forward_msat =
 									calculate_amount_to_forward_per_htlc(&htlcs, opening_fee_msat);
@@ -1474,7 +1477,10 @@ mod tests {
 				.unwrap();
 			assert!(matches!(new_state, OutboundJITChannelState::PendingPaymentForward { .. }));
 			match action {
-				Some(HTLCInterceptedAction::ForwardPayment(channel_id, payment)) => {
+				Some(HTLCInterceptedAction::ForwardPayment(ForwardPaymentAction(
+					channel_id,
+					payment,
+				))) => {
 					assert_eq!(channel_id, ChannelId([200; 32]));
 					assert_eq!(payment.opening_fee_msat, 10_000_000);
 					assert_eq!(
