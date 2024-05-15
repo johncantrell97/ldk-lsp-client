@@ -16,7 +16,7 @@ use crate::lsps2::payment_queue::{InterceptedHTLC, PaymentQueue};
 use crate::lsps2::utils::{compute_opening_fee, is_valid_opening_fee_params};
 use crate::message_queue::MessageQueue;
 use crate::prelude::{HashMap, String, ToString, Vec};
-use crate::sync::{Arc, Mutex, RwLock};
+use crate::sync::{Arc, Mutex, MutexGuard, RwLock};
 
 use lightning::events::HTLCDestination;
 use lightning::ln::channelmanager::{AChannelManager, FailureCode, InterceptId};
@@ -232,28 +232,13 @@ impl OutboundJITChannelState {
 			} => {
 				let mut payment_queue_lock = payment_queue.lock().unwrap();
 				payment_queue_lock.add_htlc(htlc);
-				if let Some((_payment_hash, htlcs)) =
-					payment_queue_lock.pop_greater_than_msat(*opening_fee_msat)
-				{
-					let pending_payment_forward = OutboundJITChannelState::PendingPaymentForward {
-						payment_queue: payment_queue.clone(),
-						opening_fee_msat: *opening_fee_msat,
-						channel_id: *channel_id,
-					};
-					let forward_payment =
-						HTLCInterceptedAction::ForwardPayment(ForwardPaymentAction(
-							*channel_id,
-							FeePayment { htlcs, opening_fee_msat: *opening_fee_msat },
-						));
-					Ok((pending_payment_forward, Some(forward_payment)))
-				} else {
-					let pending_payment = OutboundJITChannelState::PendingPayment {
-						payment_queue: payment_queue.clone(),
-						opening_fee_msat: *opening_fee_msat,
-						channel_id: *channel_id,
-					};
-					Ok((pending_payment, None))
-				}
+				let (state, payment_action) = try_get_payment(
+					Arc::clone(payment_queue),
+					payment_queue_lock,
+					*channel_id,
+					*opening_fee_msat,
+				);
+				Ok((state, payment_action.map(|pa| HTLCInterceptedAction::ForwardPayment(pa))))
 			},
 			OutboundJITChannelState::PaymentForwarded { channel_id } => {
 				let payment_forwarded =
@@ -269,19 +254,13 @@ impl OutboundJITChannelState {
 	) -> Result<(Self, ForwardPaymentAction), ChannelStateError> {
 		match self {
 			OutboundJITChannelState::PendingChannelOpen { payment_queue, opening_fee_msat } => {
-				let mut payment_queue_lock = payment_queue.lock().unwrap();
-				if let Some((_payment_hash, htlcs)) =
-					payment_queue_lock.pop_greater_than_msat(*opening_fee_msat)
-				{
-					let pending_payment_forward = OutboundJITChannelState::PendingPaymentForward {
-						payment_queue: Arc::clone(&payment_queue),
-						opening_fee_msat: *opening_fee_msat,
-						channel_id,
-					};
-					let forward_payment = ForwardPaymentAction(
-						channel_id,
-						FeePayment { opening_fee_msat: *opening_fee_msat, htlcs },
-					);
+				let payment_queue_lock = payment_queue.lock().unwrap();
+				if let (pending_payment_forward, Some(forward_payment)) = try_get_payment(
+					Arc::clone(payment_queue),
+					payment_queue_lock,
+					channel_id,
+					*opening_fee_msat,
+				) {
 					Ok((pending_payment_forward, forward_payment))
 				} else {
 					Err(ChannelStateError(
@@ -306,28 +285,13 @@ impl OutboundJITChannelState {
 				opening_fee_msat,
 				channel_id,
 			} => {
-				let mut payment_queue_lock = payment_queue.lock().unwrap();
-				if let Some((_payment_hash, htlcs)) =
-					payment_queue_lock.pop_greater_than_msat(*opening_fee_msat)
-				{
-					let pending_payment_forward = OutboundJITChannelState::PendingPaymentForward {
-						payment_queue: payment_queue.clone(),
-						opening_fee_msat: *opening_fee_msat,
-						channel_id: *channel_id,
-					};
-					let forward_payment = ForwardPaymentAction(
-						*channel_id,
-						FeePayment { htlcs, opening_fee_msat: *opening_fee_msat },
-					);
-					Ok((pending_payment_forward, Some(forward_payment)))
-				} else {
-					let pending_payment = OutboundJITChannelState::PendingPayment {
-						payment_queue: payment_queue.clone(),
-						opening_fee_msat: *opening_fee_msat,
-						channel_id: *channel_id,
-					};
-					Ok((pending_payment, None))
-				}
+				let payment_queue_lock = payment_queue.lock().unwrap();
+				Ok(try_get_payment(
+					Arc::clone(payment_queue),
+					payment_queue_lock,
+					*channel_id,
+					*opening_fee_msat,
+				))
 			},
 			OutboundJITChannelState::PendingPayment {
 				payment_queue,
@@ -1251,6 +1215,27 @@ fn calculate_amount_to_forward_per_htlc(
 		per_htlc_forwards.push((htlc.intercept_id, amount_to_forward_msat))
 	}
 	per_htlc_forwards
+}
+
+fn try_get_payment(
+	payment_queue: Arc<Mutex<PaymentQueue>>, mut payment_queue_lock: MutexGuard<PaymentQueue>,
+	channel_id: ChannelId, opening_fee_msat: u64,
+) -> (OutboundJITChannelState, Option<ForwardPaymentAction>) {
+	if let Some((_payment_hash, htlcs)) = payment_queue_lock.pop_greater_than_msat(opening_fee_msat)
+	{
+		let pending_payment_forward = OutboundJITChannelState::PendingPaymentForward {
+			payment_queue,
+			opening_fee_msat,
+			channel_id,
+		};
+		let forward_payment =
+			ForwardPaymentAction(channel_id, FeePayment { htlcs, opening_fee_msat });
+		(pending_payment_forward, Some(forward_payment))
+	} else {
+		let pending_payment =
+			OutboundJITChannelState::PendingPayment { payment_queue, opening_fee_msat, channel_id };
+		(pending_payment, None)
+	}
 }
 
 #[cfg(test)]
